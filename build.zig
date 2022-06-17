@@ -30,7 +30,7 @@ pub fn build(b: *Builder) void {
 
     const rp2040_ras = std.build.Pkg{
         .name = "rp2040_ras",
-        .path = std.build.FileSource{
+        .source = .{
             .path = "rp2040_ras/rp2040_ras.zig",
         },
     };
@@ -133,8 +133,7 @@ const WriteChecksumStep = struct {
         const elf_filename = self.elf_file_source.getPath(self.builder);
 
         const elf_file = try std.fs.cwd().openFile(elf_filename, .{
-            .read = true,
-            .write = true,
+            .mode = std.fs.File.OpenMode.read_write,
         });
         defer elf_file.close();
 
@@ -207,7 +206,7 @@ const GenerateUF2Step = struct {
         const elf_file = try std.fs.cwd().openFile(
             elf_filename,
             .{
-                .read = true,
+                .mode = std.fs.File.OpenMode.read_only,
             },
         );
         defer elf_file.close();
