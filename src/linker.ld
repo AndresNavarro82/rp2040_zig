@@ -26,7 +26,7 @@ SECTIONS {
     } > FLASH_BOOT2
 
     .text : {
-        __test_start = .;
+        __text_start = .;
         __start = .;
         KEEP(*(.text.start))
         *(.text*)
