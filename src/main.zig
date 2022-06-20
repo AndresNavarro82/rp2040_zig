@@ -77,6 +77,47 @@ fn uart_send_string(str: [] const u8) void {
     }
 }
 
+fn uart_try_get_char() ?u8 {
+    // XXX: ignore errors for now (parity, framing, break)
+    // only return char is fifo isn't empty
+    return if (regs.UART0.UARTFR.read().RXFE == 0) regs.UART0.UARTDR.read().DATA else null;
+}
+
+fn uart_get_char() u8 {
+    // XXX: ignore errors for now (parity, framing, break)
+    // wait until fifo has at least one char
+    while (regs.UART0.UARTFR.read().RXFE == 1) {}
+    return regs.UART0.UARTDR.read().DATA;
+}
+
+// get a line (including carriage return)
+// XXX default minicom ends lines with carriage return only
+fn uart_get_line(str: [] u8) [] u8 {
+    var i:usize = 0;
+    while(i < str.len) {
+        const c = uart_get_char();
+        str[i] = c;
+        i += 1;
+        if (c == '\r') {
+            break;
+        }
+    }
+    return str[0..i];
+}
+
+fn led_config() void {
+    gpio.set_dir(.P25, .Output);
+    gpio.set_function(.P25, .F5);
+    sio.set_output_enable(.GPIO25);
+}
+
+fn led_blink_once() void {
+    sio.set_output(.GPIO25);
+    busy_wait();
+    sio.clear_output(.GPIO25);
+    busy_wait();
+}
+
 pub fn hako_main() noreturn {
     clocks_init();
 
@@ -84,23 +125,21 @@ pub fn hako_main() noreturn {
     reset.deassert_reset_of(.UART0);
 
     uart0_config();
+    // XXX default minicom doesn't like just \n
+    uart_send_string("Hello RP2040!\r\n");
 
-    gpio.set_dir(.P25, .Output);
-    gpio.set_function(.P25, .F5);
-
-    sio.set_output_enable(.GPIO25);
+    led_config();
+    led_blink_once();
 
     while (true) {
-        sio.set_output(.GPIO25);
-        busy_wait();
-        busy_wait();
-        busy_wait();
-
-        sio.clear_output(.GPIO25);
-        busy_wait();
-
-        // minicom doesn't like just \n without some additional config
-        uart_send_string("Hello RP2040!\r\n");
+        var buf:[128]u8 = undefined;
+        const line = uart_get_line(&buf);
+        uart_send_string(line);
+        // XXX add newline for minicom
+        if (line[line.len-1] == '\r') {
+            uart_send_char('\n');
+        }
+        led_blink_once();
     }
 }
 
